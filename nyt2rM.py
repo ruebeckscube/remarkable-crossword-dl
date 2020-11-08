@@ -1,16 +1,15 @@
-#!/usr/bin/env python3
-
-import requests
 import http.cookiejar
-import rmapy.api as rmapi
-import io
 import datetime
+import io
+import requests
+import rmapy.api as rmapi
 
 XWFOLDERNAME = "Crosswords"
 
-def getNytInfo(dateStart: datetime.date, dateEnd: datetime.date) -> (str,str):
+
+def getNytInfo(dateStart: datetime.date, dateEnd: datetime.date) -> (str, str):
     params = {'publish_type': 'daily',
-              'sort_order':'asc',
+              'sort_order': 'asc',
               'sort_by': 'print_date',
               'date_start': str(dateStart),
               'date_end': str(dateEnd),
@@ -34,7 +33,7 @@ def downloadNytPdf(puzzId: str) -> requests.Response:
 
 def findOrCreateXwSubFolder(rmClient,folderName) -> rmapi.Folder:
     crosswordFolder = findOrCreateXwFolder(rmClient)
-    folders = [f for f in rmClient.get_meta_items()
+    folders = [f for f in rmClient.get_meta_items(True)
                if f.VissibleName == folderName
                and f.Parent == crosswordFolder.ID
                and isinstance(f,rmapi.Folder)]
@@ -43,13 +42,14 @@ def findOrCreateXwSubFolder(rmClient,folderName) -> rmapi.Folder:
         destFolder = rmapi.Folder(folderName)
         destFolder.Parent = findOrCreateXwFolder(rmClient).ID
         rmClient.create_folder(destFolder)
+        rmClient.get_meta_items(False)
     else:
         destFolder = folders[0]
     return destFolder
 
 
 def findOrCreateXwFolder(rmClient) -> rmapi.Folder:
-    folders = [ f for f in rmClient.get_meta_items()
+    folders = [ f for f in rmClient.get_meta_items(True)
                         if f.VissibleName == XWFOLDERNAME
                         and f.Parent != "trash"
                         and isinstance(f,rmapi.Folder) ]
@@ -57,49 +57,70 @@ def findOrCreateXwFolder(rmClient) -> rmapi.Folder:
     if len(folders)== 0:
         crosswordFolder = rmapi.Folder(XWFOLDERNAME)
         rmClient.create_folder(crosswordFolder)
+        rmClient.get_meta_items(False)
     else:
         crosswordFolder = folders[0]
     return crosswordFolder
 
-def docExists(rmClient,docName,folder) -> bool:
-    docs = [ d for d in rmClient.get_meta_items()
-                     if d.VissibleName == docName
-                     and d.Parent == folder.ID
-                     and isinstance(d,rmapi.Document) ]
-    return (len(docs)>0)
+
+def docExists(rmClient, docName, folder) -> bool:
+    docs = [d for d in rmClient.get_meta_items(1)
+            if d.VissibleName == docName
+            and d.Parent == folder.ID
+            and isinstance(d, rmapi.Document)]
+    return len(docs) > 0
+
 
 class ZipDocFromBytesIO(rmapi.ZipDocument):
-    def __init__(self,name: str, IO: io.BytesIO, fileType: str):
+    def __init__(self, name: str, IO: io.BytesIO, fileType: str):
         super().__init__()
-        if fileType=="pdf":
+        if fileType == "pdf":
             self.content["fileType"] = "pdf"
-            self.pdf=IO
-        if fileType=="epub":
+            self.pdf = IO
+        if fileType == "epub":
             self.content["fileType"] = "epub"
-            self.epub=IO
+            self.epub = IO
         self.metadata["VissibleName"] = name
 
-def downloadNyt(dateStart: datetime.date, dateEnd: datetime.date):
+
+def mostRecentDownloadDate(rmClient: rmapi.Client, folder: rmapi.Folder) -> datetime.date:
+    docs = [d for d in rmClient.get_meta_items(1)
+            if d.Parent == folder.ID
+            and isinstance(d, rmapi.Document)]
+    return max([datetime.date.fromisoformat(d.VissibleName) for d in docs])
+
+
+def downloadNytCrosswords(dateStart: datetime.date, dateEnd: datetime.date):
+    '''
+    Download a range of NYT crossword puzzles for the specified
+    date range.
+
+    :param datetime.date dateStart: defaults to last unimported puzzle, up to ten days
+    :param datetime.date dateEnd: defaults to the most recent released NYT puzzle
+    '''
     rmClient = rmapi.Client()
     rmClient.renew_token()
 
-    destFolder = findOrCreateXwSubFolder(rmClient,"New York Times")
 
+    destFolder = findOrCreateXwSubFolder(rmClient, "New York Times")
+
+    today = datetime.date.today()
     if dateEnd is None:
-        dateEnd = datetime.date.today() + datetime.timedelta(1)
+        dateEnd = today + datetime.timedelta(1)
     if dateStart is None:
-        dateStart = None
-    nytInfo=getNytInfo(dateStart,dateEnd)
-    puzzId = str(nytInfo[0]['puzzle_id'])
-    printDate = str(nytInfo[0]['print_date'])
+        dateStart = mostRecentDownloadDate(rmClient, destFolder) + datetime.timedelta(1)
+        dateStart = max(dateStart, today - datetime.timedelta(10))
+    nytInfo = getNytInfo(dateStart, dateEnd)
 
-    name=printDate
-    if docExists(rmClient,name,destFolder):
-        print("Already downloaded")
-        return
-    pdfResponse = downloadNytPdf(puzzId)
-    doc = ZipDocFromBytesIO(name,io.BytesIO(pdfResponse.content),"pdf")
-    rmClient.upload(doc,destFolder)
-    
-if __name__=="__main__":
-    downloadNyt()
+    for metadata in nytInfo:
+        puzzId = str(metadata['puzzle_id'])
+        printDate = str(metadata['print_date'])
+
+        name = printDate
+        if docExists(rmClient, name, destFolder):
+            print("Already downloaded " + name)
+            continue
+        pdfResponse = downloadNytPdf(puzzId)
+        doc = ZipDocFromBytesIO(name, io.BytesIO(pdfResponse.content), "pdf")
+        rmClient.upload(doc, destFolder)
+        print("Successfully downloaded " + name)
