@@ -7,7 +7,7 @@ import rmapy.api as rmapi
 XWFOLDERNAME = "Crosswords"
 
 
-def getNytInfo(dateStart: datetime.date, dateEnd: datetime.date) -> (str, str):
+def getNytInfo(dateStart: datetime.date, dateEnd: datetime.date):
     params = {'publish_type': 'daily',
               'sort_order': 'asc',
               'sort_by': 'print_date',
@@ -15,7 +15,7 @@ def getNytInfo(dateStart: datetime.date, dateEnd: datetime.date) -> (str, str):
               'date_end': str(dateEnd),
               'limit': '100', }
     url = 'https://nyt-games-prd.appspot.com/svc/crosswords/v3/36569100/puzzles.json'
-    req = requests.get(url,params)
+    req = requests.get(url, params)
     req.raise_for_status()
     return req.json()['results']
 
@@ -110,6 +110,10 @@ def downloadNytCrosswords(dateStart: datetime.date, dateEnd: datetime.date):
     if dateStart is None:
         dateStart = mostRecentDownloadDate(rmClient, destFolder) + datetime.timedelta(1)
         dateStart = max(dateStart, today - datetime.timedelta(10))
+    if dateStart > dateEnd:
+        print("No new puzzles to download")
+        return
+
     nytInfo = getNytInfo(dateStart, dateEnd)
 
     for metadata in nytInfo:
