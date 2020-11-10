@@ -1,3 +1,4 @@
+import os
 import http.cookiejar
 import datetime
 import io
@@ -21,7 +22,8 @@ def getNytInfo(dateStart: datetime.date, dateEnd: datetime.date):
 
 
 def downloadNytPdf(puzzId: str) -> requests.Response:
-    cookieJar = http.cookiejar.MozillaCookieJar('nyt-cookies.txt')
+    filePath = os.path.join(os.path.dirname(__file__), "nyt-cookies.txt")
+    cookieJar = http.cookiejar.MozillaCookieJar(filePath)
     cookieJar.load()
 
     url = 'https://www.nytimes.com/svc/crosswords/v2/puzzle/' + puzzId + '.pdf'
