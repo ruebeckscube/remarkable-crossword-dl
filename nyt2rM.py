@@ -1,6 +1,7 @@
 import os
 import http.cookiejar
 import datetime
+import time
 import io
 import requests
 import rmapy.api as rmapi
@@ -101,8 +102,20 @@ def downloadNytCrosswords(dateStart: datetime.date, dateEnd: datetime.date):
     :param datetime.date dateEnd: defaults to the most recent released NYT puzzle
     '''
     rmClient = rmapi.Client()
-    rmClient.renew_token()
 
+    # Try a few times, this will sometimes excute on wakeup so internet might not be connected yet.
+    success = False
+    for i in range(5):
+        try:
+            rmClient.renew_token()
+            success = True
+            break
+        except(requests.exceptions.ConnectionError):
+            time.sleep(60)
+    if not success:
+        print("Failed to renew token from reMarkable after five" +
+              " minutes. Probably internet is down.")
+        return
 
     destFolder = findOrCreateXwSubFolder(rmClient, "New York Times")
 
