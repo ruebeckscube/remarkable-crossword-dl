@@ -36,7 +36,7 @@ def downloadNytPdf(puzzId: str) -> requests.Response:
 
 def findOrCreateXwSubFolder(rmClient,folderName) -> rmapi.Folder:
     crosswordFolder = findOrCreateXwFolder(rmClient)
-    folders = [f for f in rmClient.get_meta_items(True)
+    folders = [f for f in rmClient.get_meta_items()
                if f.VissibleName == folderName
                and f.Parent == crosswordFolder.ID
                and isinstance(f,rmapi.Folder)]
@@ -45,29 +45,29 @@ def findOrCreateXwSubFolder(rmClient,folderName) -> rmapi.Folder:
         destFolder = rmapi.Folder(folderName)
         destFolder.Parent = findOrCreateXwFolder(rmClient).ID
         rmClient.create_folder(destFolder)
-        rmClient.get_meta_items(False)
+        rmClient.get_meta_items(True)
     else:
         destFolder = folders[0]
     return destFolder
 
 
 def findOrCreateXwFolder(rmClient) -> rmapi.Folder:
-    folders = [ f for f in rmClient.get_meta_items(True)
+    folders = [f for f in rmClient.get_meta_items()
                         if f.VissibleName == XWFOLDERNAME
                         and f.Parent != "trash"
-                        and isinstance(f,rmapi.Folder) ]
+                        and isinstance(f,rmapi.Folder)]
     crosswordFolder = None
     if len(folders)== 0:
         crosswordFolder = rmapi.Folder(XWFOLDERNAME)
         rmClient.create_folder(crosswordFolder)
-        rmClient.get_meta_items(False)
+        rmClient.get_meta_items(True)
     else:
         crosswordFolder = folders[0]
     return crosswordFolder
 
 
 def docExists(rmClient, docName, folder) -> bool:
-    docs = [d for d in rmClient.get_meta_items(1)
+    docs = [d for d in rmClient.get_meta_items()
             if d.VissibleName == docName
             and d.Parent == folder.ID
             and isinstance(d, rmapi.Document)]
@@ -86,8 +86,17 @@ class ZipDocFromBytesIO(rmapi.ZipDocument):
         self.metadata["VissibleName"] = name
 
 
+class CachedRmClient(rmapi.Client):
+    def __init__(self):
+        super().__init__()
+        self.__cached_meta_items = None
+    def get_meta_items(self, refresh=False):
+        if refresh or (self.__cached_meta_items is None):
+            self.__cached_meta_items = super().get_meta_items()
+        return self.__cached_meta_items
+
 def mostRecentDownloadDate(rmClient: rmapi.Client, folder: rmapi.Folder) -> datetime.date:
-    docs = [d for d in rmClient.get_meta_items(1)
+    docs = [d for d in rmClient.get_meta_items()
             if d.Parent == folder.ID
             and isinstance(d, rmapi.Document)]
     return max([datetime.date.fromisoformat(d.VissibleName) for d in docs])
@@ -101,7 +110,7 @@ def downloadNytCrosswords(dateStart: datetime.date, dateEnd: datetime.date):
     :param datetime.date dateStart: defaults to last unimported puzzle, up to ten days
     :param datetime.date dateEnd: defaults to the most recent released NYT puzzle
     '''
-    rmClient = rmapi.Client()
+    rmClient = CachedRmClient()
 
     # Try a few times, this will sometimes excute on wakeup so internet might not be connected yet.
     success = False
