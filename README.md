@@ -13,6 +13,23 @@ This is a script for syncing crosswords to a reMarkable device. It doesn't need 
 4. To run the executable manually, while in the `remarkable-crossword-dl/` folder, enter `./syncCrosswords.py <start_date> <end_date>`. The dates should be in ISO format (YYYY-MM-DD), and if not provided have defaults. `end_date` defaults to tomorrow, since NYT crosswords are published the evening before, and `start_date` defaults to the last undownloaded puzzle on your reMarkable cloud, with a max of 10 days ago.
 5. You can also schedule it with your choice of script scheduler. An example plist for use with launchd is included in this project.
 
+## Usage
+
+```
+$ ./syncCrosswords.py --help
+usage: syncCrosswords.py [-h] [-t] [start] [end]
+
+Syncs a copy of the New York Times Crossword to your Remarkable
+
+positional arguments:
+  start        Start Date in ISO format (YYYY-MM-DD)
+  end          End Date in ISO format (YYYY-MM-DD)
+
+optional arguments:
+  -h, --help   show this help message and exit
+  -t, --today  Just get today's crossword. NOTE: Will ignore start/end arguments.
+```
+
 ## Sources
 [HTTP requests for NYT Crossword](https://www.reddit.com/r/crossword/comments/dqtnca/my_automatic_nyt_crossword_downloading_script/)
 
