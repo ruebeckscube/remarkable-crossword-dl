@@ -1,5 +1,7 @@
 # remarkable-crossword-dl
 
+NOTE 2/1/2025: This project now archived. It's been broken due to changes in reMarkable's cloud API. If it's going to be re-done it will probably have to be through the USB web interface, as the cloud API has gotten less accessible to developers.
+
 This is a script for syncing crosswords to a reMarkable device. It doesn't need to be run on the reMarkable itself, since it sends PDFs of the crosswords to the cloud. It requires already having a subscription to the crosswords you want to download.
 
 ## Crosswords supported
